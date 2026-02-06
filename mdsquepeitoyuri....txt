@@ -1,0 +1,840 @@
+-- Inicialização da biblioteca
+local ServerUi = loadstring(game:HttpGet("https://raw.githubusercontent.com/ServerSad/UiLib/refs/heads/main/Lib/uilib.lua"))()
+
+local ps = game:GetService("Players").LocalPlayer.PlayerScripts
+ps.QuitsAntiCheatLocal.Disabled = true
+ps.QuitsAntiCheatChecker.Disabled = true
+
+-- ESP DEFINITIVO: HOMER (AMARELO) VS BART (VERMELHO) 🌟
+-- ==========================================================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local Connections = {}
+
+-- Configuração de Cores Exatas
+local Cores = {
+    Homer = Color3.fromRGB(255, 230, 0), -- Amarelo Vivo
+    Bart = Color3.fromRGB(255, 0, 0),    -- Vermelho Puro
+    Fallback = Color3.fromRGB(255, 255, 255) -- Branco (só se não achar ninguém)
+}
+
+-- Função Ninja para detectar o time (Busca por nome ou cor do time)
+local function IdentificarCorDoTime(player)
+    local team = player.Team
+    local teamName = team and team.Name:lower() or ""
+    local teamColor = team and team.TeamColor.Name or ""
+
+    -- Lógica para o HOMER (Amarelo)
+    if string.find(teamName, "homer") or teamColor:find("Yellow") or teamColor:find("Gold") then
+        return Cores.Homer
+    -- Lógica para o BART (Vermelho)
+    elseif string.find(teamName, "bart") or teamColor:find("Red") or teamColor:find("Crimson") then
+        return Cores.Bart
+    end
+    
+    return Cores.Fallback
+end
+
+local function AdicionarESP(player)
+    if player == LocalPlayer then return end
+
+    local function aplicar(character)
+        if not character then return end
+        local root = character:WaitForChild("HumanoidRootPart", 10)
+        local head = character:WaitForChild("Head", 10)
+        if not root or not head then return end
+
+        local corDoTime = IdentificarCorDoTime(player)
+
+        -- 1. HIGHLIGHT (O brilho em volta do corpo)
+        local highlight = character:FindFirstChild("HardcoreHighlight") or Instance.new("Highlight")
+        highlight.Name = "HardcoreHighlight"
+        highlight.Adornee = character
+        highlight.FillColor = corDoTime
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.FillTransparency = 0.4
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Parent = character
+
+        -- 2. BILLBOARD GUI (O Nome flutuante)
+        local billboard = head:FindFirstChild("NameESP") or Instance.new("BillboardGui")
+        billboard.Name = "NameESP"
+        billboard.Adornee = head
+        billboard.Size = UDim2.new(0, 150, 0, 50)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = head
+
+        local label = billboard:FindFirstChild("TextLabel") or Instance.new("TextLabel")
+        label.Parent = billboard
+        label.BackgroundTransparency = 1
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.Text = (player.DisplayName or player.Name)
+        label.TextColor3 = corDoTime -- Cor do texto igual a do time
+        label.TextStrokeTransparency = 0
+        label.TextSize = 16
+        label.Font = Enum.Font.GothamBold
+    end
+
+    aplicar(player.Character)
+    player.CharacterAdded:Connect(aplicar)
+end
+
+-- FUNÇÕES DE CONTROLE (CHAME PELO SEU TOGGLE)
+
+function AtivarESP()
+    DesativarESP() -- Limpeza preventiva
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        AdicionarESP(player)
+    end
+
+    table.insert(Connections, Players.PlayerAdded:Connect(AdicionarESP))
+    print("✅ ESP COLORIDO ATIVADO: AMARELO (HOMER) | VERMELHO (BART)")
+end
+
+function DesativarESP()
+    for _, conn in pairs(Connections) do if conn then conn:Disconnect() end end
+    Connections = {}
+
+    for _, player in pairs(Players:GetPlayers()) do
+        local char = player.Character
+        if char then
+            local h = char:FindFirstChild("HardcoreHighlight")
+            if h then h:Destroy() end
+            if char:FindFirstChild("Head") then
+                local n = char.Head:FindFirstChild("NameESP")
+                if n then n:Destroy() end
+            end
+        end
+    end
+    print("❌ ESP DESATIVADO")
+end
+
+-- REMOVIDO: AtivarESP() <-- Não executa mais sozinho ao injetar.
+
+local Light = game:GetService("Lighting")
+
+-- Guardamos os valores originais para poder desativar depois
+local OriginalSettings = {
+    Ambient = Light.Ambient,
+    ColorShift_Bottom = Light.ColorShift_Bottom,
+    ColorShift_Top = Light.ColorShift_Top,
+    Brightness = Light.Brightness,
+    OutdoorAmbient = Light.OutdoorAmbient
+}
+
+local FullBrightEnabled = false
+local LightConnection -- Guardamos a conexão aqui
+
+function AtivarFullBright()
+    FullBrightEnabled = true
+    
+    local function apply()
+        if not FullBrightEnabled then return end
+        Light.Ambient = Color3.new(1, 1, 1)
+        Light.ColorShift_Bottom = Color3.new(1, 1, 1)
+        Light.ColorShift_Top = Color3.new(1, 1, 1)
+        Light.Brightness = 3 -- Brilho aumentado para ficar bem claro
+        Light.OutdoorAmbient = Color3.new(1, 1, 1) -- Remove as sombras de fora
+    end
+
+    apply()
+    -- Conecta para o caso do jogo tentar mudar o tempo/iluminação
+    LightConnection = Light.Changed:Connect(apply)
+    print("☀️ FULLBRIGHT: ATIVADO")
+end
+
+function DesativarFullBright()
+    FullBrightEnabled = false
+    if LightConnection then 
+        LightConnection:Disconnect() 
+        LightConnection = nil
+    end
+    
+    -- Restaura a iluminação original do jogo
+    Light.Ambient = OriginalSettings.Ambient
+    Light.ColorShift_Bottom = OriginalSettings.ColorShift_Bottom
+    Light.ColorShift_Top = OriginalSettings.ColorShift_Top
+    Light.Brightness = OriginalSettings.Brightness
+    Light.OutdoorAmbient = OriginalSettings.OutdoorAmbient
+    print("🌙 FULLBRIGHT: DESATIVADO")
+end
+
+local Player = game:GetService("Players").LocalPlayer
+
+-- Definimos os valores, mas NÃO aplicamos ainda
+_G.VelocidadeConfigurada = 19 
+_G.WalkSpeedAtivo = false -- Isso garante que comece desligado
+
+-- Função que apenas monitora o personagem (sem mudar a velocidade sozinha)
+local function MonitorarPersonagem(character)
+    local humanoid = character:WaitForChild("Humanoid")
+    -- Só aplica se o Toggle estiver ligado
+    if _G.WalkSpeedAtivo then
+        humanoid.WalkSpeed = _G.VelocidadeConfigurada
+    end
+end
+
+Player.CharacterAdded:Connect(MonitorarPersonagem)
+
+-- ==============================
+-- Configuração de cargos
+ServerUi:MakeRoles({
+    VIP = {
+        Color = "#FFFFFF",
+        Users = {11223344, "iniciandoemjogos3", "NomeDoMeuAmigo"}
+    },
+    User = {
+        Color = "#FFFFFF",
+        Users = "everyone"
+    }
+})
+
+-- Criação da janela principal
+local Window = ServerUi:MakeWindow({
+    Name = "Guloso Hub",
+    SaveConfig = true,
+    ConfigFolder = "MinhaPasta",
+    IntroText = "Bem-vindo!",
+    IntroEnabled = true,
+    ShowIcon = true,
+    Icon = "rbxassetid://106922439759337",
+    IntroIcon = "rbxassetid://106922439759337",
+    SearchBar = {
+        Default = "🔍 Procurar...",
+        ClearTextOnFocus = true
+    },
+    KeySystem = true,
+    KeySettings = {
+        Title = "🔐 Key System",
+        Subtitle = "Digite sua chave para continuar",
+        LoadingTitle = "Carregando",
+        LoadingSubtitle = "...",
+        Author = "ServerUI",
+        Textbox = "Insira aqui a key...",
+        Button = "Confirmar",
+        KeyButton = "https://lootdest.org/s?38gZrHMq",
+        Note = "PEGUE A PORRA DA KEY NO BOTÃO DE CHAVE ALI EM CIMA SEU VAGABUNDO🥀👎",
+        FileName = "MinhaKey.txt",
+        SaveKey = false,
+        Key = {"Guloso2013", "444Dokidoki"},
+        Getfromsite = "https://link-hub.net/3208482/GzkdkBHvvPs4",
+        UseServerKey = true,
+        ServerKey = "meu-token",
+        ServerKeyPadrao = "Key-123"
+    }
+})
+
+-- Aba principal (acessível a todos)
+local Tab = Window:MakeTab({
+    Name = "Principal",
+    Icon = "home",
+    RequiredRole = "AllRoles"
+})
+
+-- Aba principal (acessível a todos)
+local Tab3 = Window:MakeTab({
+    Name = "Skins Yvsh(Bart)",
+    Icon = "rbxassetid://117081213165253",
+    RequiredRole = "AllRoles"
+})
+
+-- Aba especial (só para usuários com cargo "VIP")
+local Tab2 = Window:MakeTab({
+    Name = "VIP",
+    Icon = "crown",
+    RequiredRole = "VIP"
+})
+
+local Tab4 = Window:MakeTab({
+    Name = "Skin Yvsh(Homer)",
+    Icon = "rbxassetid://125279215874224",
+    RequiredRole = "AllRoles"
+})
+
+-- Aba principal (acessível a todos)
+local Tab5 = Window:MakeTab({
+    Name = "Fun/Farm",
+    Icon = "user",
+    RequiredRole = "AllRoles"
+})
+
+local Tab6 = Window:MakeTab({
+    Name = "Teleporte",
+    Icon = "arrow-up-left",
+    RequiredRole = "AllRoles"
+})
+
+-- Notificação de boas-vindas
+ServerUi:MakeNotification({
+    Name = "Bem vindo!",
+    Content = "Sua interface foi carregada com sucesso!",
+    Time = 3
+})
+
+ -- Componente de Botão Simples na aba principal --
+
+Tab:AddButton({
+    Name = "Executar Wallhop",
+    Callback = function()
+        -- Esse código roda toda vez que você clica no botão
+        print("Botão clicado: Carregando script...")
+        
+        -- Executa o seu script do GitHub
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/nickuser757/Script/refs/heads/main/Script"))()
+    end
+})
+
+--ESP--
+Tab:AddToggle({
+    Name = "ESP",
+    Default = false,
+    Flag = "ESP",
+    Save = true,
+    Callback = function(state)
+        -- Aqui você NÃO cola o código todo. 
+        -- Você apenas CHAMA as funções que criou no topo:
+        if state then
+            AtivarESP()
+        else
+            DesativarESP()
+        end
+    end
+})
+
+-- TOGGLE PARA FULL BRIGHT --
+Tab:AddToggle({
+    Name = "Full Bright",
+    Default = false,
+    Flag = "FullBrightFlag",
+    Save = true,
+    Callback = function(state)
+        if state then
+            AtivarFullBright()
+        else
+            DesativarFullBright()
+        end
+    end
+})
+
+local RitualSpeed = 0.01
+local RitualEnabled = false
+local RitualNoclipConnection = nil
+
+-- INÍCIO DO RITUAL ATUALIZADO (RODANDO RÁPIDO) --
+Tab5:AddButton({
+    Name = "Fake Ritual (Homer)",
+    Callback = function()
+        local Character = LocalPlayer.Character
+        local Humanoid = Character and Character:FindFirstChild('Humanoid')
+        local HRP = Character and Character:FindFirstChild('HumanoidRootPart')
+        
+        if HRP and Humanoid then
+            -- Criação da plataforma
+            local Part = Instance.new('Part')
+            Part.Size = Vector3.new(8, 1, 8)
+            Part.CFrame = HRP.CFrame * CFrame.new(0, -3.5, 0)
+            Part.Anchored = true
+            Part.CanCollide = true
+            Part.BrickColor = BrickColor.new('Bright red')
+            Part.Material = Enum.Material.Neon
+            Part.Parent = workspace
+
+            local PosicaoInicial = HRP.CFrame
+            local Duracao = 4 
+            local DistanciaSubida = 20 
+            local Voltas = 5 -- Define a velocidade (Quanto mais voltas, mais rápido)
+
+            task.spawn(function()
+                local tempo = 0
+                while tempo < Duracao do
+                    local dt = task.wait()
+                    tempo = tempo + dt
+                    local pct = math.min(tempo / Duracao, 1)
+                    
+                    -- Calcula posição subindo e rotação rápida
+                    local novaPos = PosicaoInicial * CFrame.new(0, pct * DistanciaSubida, 0)
+                    local novaRot = CFrame.Angles(0, math.rad(pct * 360 * Voltas), 0)
+                    
+                    HRP.CFrame = novaPos * novaRot
+                    Part.CFrame = novaPos * CFrame.new(0, -3.5, 0) -- Plataforma acompanha subida
+                end
+                
+                task.wait(0.2)
+                Humanoid.Health = 0 -- Respawn
+                task.wait(0.5)
+                Part:Destroy()
+            end)
+        end
+    end
+})
+-- FIM DO RITUAL ATUALIZADO --
+
+-- AUTO KILL BARTS
+
+local KillAllEnabled = false
+
+Tab:AddToggle({
+    Name = "Kill All (Homer)",
+    Default = false,
+    Flag = "KillAllHomer",
+    Save = true,
+    Callback = function(Value)
+        KillAllEnabled = Value
+        
+        if KillAllEnabled then
+            -- Verifica se está no time Homer
+            if LocalPlayer.Team and LocalPlayer.Team.Name ~= "Homer" then
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = "Auto Kill",
+                    Text = "Only works when on team Homer!",
+                    Duration = 3
+                })
+                return
+            end
+
+            -- Inicia o loop do seu script original
+            task.spawn(function()
+                while KillAllEnabled do
+                    task.wait(1)
+                    
+                    if not LocalPlayer.Character then continue end
+                    if not LocalPlayer.Team or LocalPlayer.Team.Name ~= "Homer" then continue end
+                    
+                    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if not myHRP then continue end
+                    
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if player ~= LocalPlayer and player.Team and player.Team.Name == "Bart" then
+                            local char = player.Character
+                            if char then
+                                local hrp = char:FindFirstChild("HumanoidRootPart")
+                                local humanoid = char:FindFirstChild("Humanoid")
+                                
+                                if hrp and humanoid and humanoid.Health > 0 then
+                                    myHRP.CFrame = hrp.CFrame
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+-- AUTO FARM QUIDZ
+Tab5:AddButton({
+    Name = "Auto Farm(Quidz)",
+    Callback = function()
+        print("Carregando script...")
+        -- Executa o loadstring do link fornecido
+        loadstring(game:HttpGet("https://pastebin.com/raw/NAjg4tAb"))()
+    end
+})
+
+-- // VARIÁVEIS DE CONTROLE // --
+local WalkSpeedEnabled = false
+local MinhaVelocidade = 20 -- Você pode mudar esse número para o que quiser
+local Player = game:GetService("Players").LocalPlayer
+
+-- // FUNÇÃO PARA APLICAR A VELOCIDADE // --
+local function AplicarVelocidade()
+    local character = Player.Character
+    local humanoid = character and character:FindFirstChild("Humanoid")
+    
+    if humanoid then
+        if WalkSpeedEnabled then
+            humanoid.WalkSpeed = MinhaVelocidade
+        else
+            humanoid.WalkSpeed = 16 -- Velocidade padrão do Roblox
+        end
+    end
+end
+
+-- Teleporte: Island Bar Spawn
+Tab6:AddButton({
+    Name = "Teleportar para Island Bar",
+    Callback = function()
+        local Character = game.Players.LocalPlayer.Character
+        if Character and Character:FindFirstChild("HumanoidRootPart") then
+            Character.HumanoidRootPart.CFrame = CFrame.new(-2, -132, -55)
+        end
+    end
+})
+
+-- Teleporte: Homer Intermission
+Tab6:AddButton({
+    Name = "Teleportar para HOMER Intermission",
+    Callback = function()
+        local Character = game.Players.LocalPlayer.Character
+        if Character and Character:FindFirstChild("HumanoidRootPart") then
+            Character.HumanoidRootPart.CFrame = CFrame.new(-14, 104, 1805)
+        end
+    end
+})
+
+-- Teleporte: Krusty Krab (Caranguejinho)
+Tab6:AddButton({
+    Name = "Teleportar para o Caranguejinho",
+    Callback = function()
+        local Character = game.Players.LocalPlayer.Character
+        if Character and Character:FindFirstChild("HumanoidRootPart") then
+            Character.HumanoidRootPart.CFrame = CFrame.new(2, -80, -72)
+        end
+    end
+})
+
+-- Teleporte: Spaceship Spawn
+Tab6:AddButton({
+    Name = "Teleportar para Spaceship",
+    Callback = function()
+        local Character = game.Players.LocalPlayer.Character
+        if Character and Character:FindFirstChild("HumanoidRootPart") then
+            Character.HumanoidRootPart.CFrame = CFrame.new(8, -98, -209)
+        end
+    end
+})
+
+-- Teleporte: Simpsons House Spawn
+Tab6:AddButton({
+    Name = "Teleportar para Casa dos Simpsons",
+    Callback = function()
+        local Character = game.Players.LocalPlayer.Character
+        if Character and Character:FindFirstChild("HumanoidRootPart") then
+            Character.HumanoidRootPart.CFrame = CFrame.new(-23, -80, -82)
+        end
+    end
+})
+
+-- Spam Pizza
+Tab5:AddToggle({
+    Name = "Spam Pizza",
+    Default = false,
+    Flag = "spamPizzaToggle", -- Identificador único para salvar o estado
+    Save = true,
+    Callback = function(enabled)
+        SpamPizzaEnabled = enabled
+        
+        if enabled then
+            -- Inicia o loop em uma thread separada (task.spawn)
+            task.spawn(function()
+                while SpamPizzaEnabled do
+                    task.wait(0.1)
+                    
+                    -- Verifica se o jogador existe
+                    local LocalPlayer = game.Players.LocalPlayer
+                    if not LocalPlayer.Character then continue end
+                    
+                    local Backpack = LocalPlayer.Backpack
+                    local Character = LocalPlayer.Character
+                    local Humanoid = Character:FindFirstChild('Humanoid')
+                    local Pizza = Backpack:FindFirstChild('Pizza') or Character:FindFirstChild('Pizza')
+                    
+                    if Pizza and Humanoid then
+                        -- Equipar e desequipar a pizza rapidamente
+                        if Pizza.Parent == Backpack then
+                            Humanoid:EquipTool(Pizza)
+                        end
+                        
+                        task.wait(0.05)
+                        
+                        if Pizza.Parent == Character then
+                            Humanoid:UnequipTools()
+                        end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+-- NOVO: Spam Tacos
+Tab5:AddToggle({
+    Name = "Spam Taco",
+    Default = false,
+    Flag = "spamTacoToggle",
+    Save = true,
+    Callback = function(enabled)
+        SpamTacoEnabled = enabled
+        if enabled then
+            task.spawn(function()
+                while SpamTacoEnabled do
+                    task.wait(0.1)
+                    local LocalPlayer = game.Players.LocalPlayer
+                    if not LocalPlayer.Character then continue end
+                    local Backpack = LocalPlayer.Backpack
+                    local Character = LocalPlayer.Character
+                    local Humanoid = Character:FindFirstChild('Humanoid')
+                    local Taco = Backpack:FindFirstChild('Taco') or Character:FindFirstChild('Taco')
+                    if Taco and Humanoid then
+                        if Taco.Parent == Backpack then Humanoid:EquipTool(Taco) end
+                        task.wait(0.05)
+                        if Taco.Parent == Character then Humanoid:UnequipTools() end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+-- NOVO: Spam Lanterna
+Tab5:AddToggle({
+    Name = "Spam Lanterna",
+    Default = false,
+    Flag = "spamLanternaToggle",
+    Save = true,
+    Callback = function(enabled)
+        SpamLanternaEnabled = enabled
+        if enabled then
+            task.spawn(function()
+                while SpamLanternaEnabled do
+                    task.wait(0.1)
+                    local LocalPlayer = game.Players.LocalPlayer
+                    if not LocalPlayer.Character then continue end
+                    local Backpack = LocalPlayer.Backpack
+                    local Character = LocalPlayer.Character
+                    local Humanoid = Character:FindFirstChild('Humanoid')
+                    -- Busca por Flashlight ou Lanterna
+                    local Flashlight = Backpack:FindFirstChild('Flashlight') or Character:FindFirstChild('Flashlight') or Backpack:FindFirstChild('Lanterna') or Character:FindFirstChild('Lanterna')
+                    if Flashlight and Humanoid then
+                        if Flashlight.Parent == Backpack then Humanoid:EquipTool(Flashlight) end
+                        task.wait(0.05)
+                        if Flashlight.Parent == Character then Humanoid:UnequipTools() end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+-- // SEU TOGGLE CONFIGURADO // --
+Tab:AddToggle({
+    Name = "Ativar WalkSpeed",
+    Default = false,
+    Flag = "walkspeed_toggle",
+    Save = true,
+    Callback = function(state)
+        WalkSpeedEnabled = state
+        AplicarVelocidade()
+    end
+})
+
+-- // GARANTIR QUE FUNCIONE AO RENASCER // --
+Player.CharacterAdded:Connect(function(char)
+    task.wait(0.5) -- Espera o humanoide carregar
+    AplicarVelocidade()
+end)
+
+-- // LOOP ANTI-RESET (Opcional, para o jogo não tirar sua velocidade) // --
+game:GetService("RunService").Heartbeat:Connect(function()
+    if WalkSpeedEnabled then
+        local char = Player.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        if hum and hum.WalkSpeed ~= MinhaVelocidade then
+            hum.WalkSpeed = MinhaVelocidade
+        end
+    end
+end)
+
+
+-- Botão para comprar a skin 1M Bart
+Tab3:AddButton({
+    Name = "Comprar 1M Bart(desative medalhas!)",
+    Callback = function()
+        -- 1. Definimos o que queremos comprar
+        local args_comprar = {
+            "Bart",
+            "1M",
+            1
+        }
+        
+        -- 2. Enviamos o comando para o SERVIDOR do jogo (Comprar)
+        game:GetService("ReplicatedStorage"):WaitForChild("eventFolders"):WaitForChild("store"):WaitForChild("buyItem"):FireServer(unpack(args_comprar))
+
+        -- 3. Esperamos 1 segundo para o jogo processar a compra
+        task.wait(1)
+
+        -- 4. Definimos qual skin queremos equipar
+        local args_equipar = {
+            "Bart",
+            "1M"
+        }
+        
+        -- 5. Enviamos o comando para o SERVIDOR (Equipar/Trocar)
+        game:GetService("ReplicatedStorage"):WaitForChild("eventFolders"):WaitForChild("store"):WaitForChild("changeSkin"):FireServer(unpack(args_equipar))
+
+        -- 6. Mostramos a notificação de sucesso na tela
+        ServerUi:MakeNotification({
+            Name = "Sucesso!",
+            Content = "Skin 1M Bart comprada e equipada!",
+            Time = 3
+        })
+    end
+})
+
+
+-- Botão para comprar e equipar a skin CPT
+Tab3:AddButton({
+    Name = "Comprar Zé pilantra(risco de ban)",
+    Callback = function()
+        -- 1. Caminho do Remote (para o código ficar limpo)
+        local storeRemote = game:GetService("ReplicatedStorage"):WaitForChild("eventFolders"):WaitForChild("store")
+        
+        -- 2. Comprar a Skin CPT
+        -- Usei 'local' com 'l' minúsculo para não dar erro!
+        local buyArgs = {
+            "Bart",
+            "CPT"
+        }
+        storeRemote:WaitForChild("buyItem"):FireServer(unpack(buyArgs))
+
+        -- 3. Pequena pausa para o servidor entender que você agora é dono da skin
+        task.wait(1.2)
+
+        -- 4. Equipar a Skin CPT
+        local equipArgs = {
+            "Bart",
+            "CPT"
+        }
+        storeRemote:WaitForChild("changeSkin"):FireServer(unpack(equipArgs))
+
+        -- 5. Notificação de Sucesso
+        ServerUi:MakeNotification({
+            Name = "Skin CPT",
+            Content = "Comprada e equipada com sucesso!",
+            Time = 3
+        })
+    end
+})
+
+-- Botão para comprar e equipar a skin Beauty Bart
+Tab3:AddButton({
+    Name = "Comprar Beauty Bart(risco de ban)",
+    Callback = function()
+        -- 1. Caminho do Remote
+        local storeRemote = game:GetService("ReplicatedStorage"):WaitForChild("eventFolders"):WaitForChild("store")
+        
+        -- 2. Argumentos para COMPRAR
+        local buyArgs = {
+            "Bart",
+            "Beauty"
+        }
+        
+        -- Envia o comando de compra para o servidor
+        storeRemote:WaitForChild("buyItem"):FireServer(unpack(buyArgs))
+
+        -- 3. Espera o servidor processar (Essencial para não dar erro)
+        task.wait(1.2)
+
+        -- 4. Argumentos para EQUIPAR
+        local equipArgs = {
+            "Bart",
+            "Beauty"
+        }
+        
+        -- Envia o comando para vestir a skin
+        storeRemote:WaitForChild("changeSkin"):FireServer(unpack(equipArgs))
+
+        -- 5. Notificação de Feedback
+        ServerUi:MakeNotification({
+            Name = "Skin Beauty",
+            Content = "Beauty Bart foi comprada e equipada!",
+            Time = 3
+        })
+    end
+})
+
+-- Mantendo sua função original intacta no topo
+local function buySkin(character, skinName, price)
+    game:GetService('ReplicatedStorage'):WaitForChild('eventFolders')
+        :WaitForChild('store'):WaitForChild('buyItem'):FireServer(character, skinName, price)
+    task.wait(0.05)
+    game:GetService('ReplicatedStorage'):WaitForChild('eventFolders')
+        :WaitForChild('store'):WaitForChild('changeSkin'):FireServer(character, skinName)
+end
+
+--- SEÇÃO BART ---
+
+Tab3:AddButton({
+    Name = "Santa Bart [375]",
+    Callback = function()
+        buySkin('Bart', 'Santa Bart', 375)
+    end
+})
+
+Tab3:AddButton({
+    Name = "Ghost Bart [555]",
+    Callback = function()
+        buySkin('Bart', 'Ghost Bart', 555)
+    end
+})
+
+Tab3:AddButton({
+    Name = "Jacko Bart [210]",
+    Callback = function()
+        buySkin('Bart', 'Jacko Bart', 210)
+    end
+})
+
+Tab3:AddButton({
+    Name = "Frozen Bart [335]",
+    Callback = function()
+        buySkin('Bart', 'Frozen Bart', 335)
+    end
+})
+
+Tab3:AddButton({
+    Name = "700k Bart [100]",
+    Callback = function()
+        buySkin('Bart', '700k', 100)
+    end
+})
+
+Tab3:AddButton({
+    Name = "Witch Bart [350]",
+    Callback = function()
+        buySkin('Bart', 'Witch Bart', 350)
+    end
+})
+
+Tab4:AddButton({
+    Name = "Rhonda Homer [2500]",
+    Callback = function()
+        buySkin('Homer', 'Rhonda', 2500)
+    end
+})
+
+Tab4:AddButton({
+    Name = "Zomber Homer [700]",
+    Callback = function()
+        buySkin('Homer', 'Zomber', 700)
+    end
+})
+
+Tab4:AddButton({
+    Name = "Nettspend Homer [2000]",
+    Callback = function()
+        buySkin('Homer', 'Nettspend', 2000)
+    end
+})
+
+-- Texto informativo
+Tab:AddLabel("Aviso:")
+
+-- Parágrafo explicativo
+Tab:AddParagraph("Avisado ein", "Ban/expulsão.\nNão não responsablizamos por banimento use por sua conta em risco.")
+
+-- Parágrafo explicativo
+Tab3:AddParagraph("Aviso", "Conquista/skins.\nOculte as conquistas !")
+
+-- Componentes na aba especial --
+
+-- Log de sistema
+Tab2:AddLog("Log do sistema iniciado com sucesso.")
+
+-- Finalização e salvamento
+ServerUi:Init()
