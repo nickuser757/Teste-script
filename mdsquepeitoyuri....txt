@@ -1,10 +1,6 @@
 -- Inicialização da biblioteca
 local ServerUi = loadstring(game:HttpGet("https://raw.githubusercontent.com/ServerSad/UiLib/refs/heads/main/Lib/uilib.lua"))()
 
-local ps = game:GetService("Players").LocalPlayer.PlayerScripts
-ps.QuitsAntiCheatLocal.Disabled = true
-ps.QuitsAntiCheatChecker.Disabled = true
-
 -- ESP DEFINITIVO: HOMER (AMARELO) VS BART (VERMELHO) 🌟
 -- ==========================================================
 local Players = game:GetService("Players")
