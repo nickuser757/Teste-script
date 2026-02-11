@@ -1,9 +1,75 @@
 -- Inicialização da biblioteca
 local ServerUi = loadstring(game:HttpGet("https://raw.githubusercontent.com/ServerSad/UiLib/refs/heads/main/Lib/uilib.lua"))()
 
-local ps = game:GetService("Players").LocalPlayer.PlayerScripts
-ps.QuitsAntiCheatLocal.Disabled = true
-ps.QuitsAntiCheatChecker.Disabled = true
+-- Carrega a biblioteca de notificações
+local fnl = loadstring(game:HttpGetAsync('https://raw.githubusercontent.com/Code1Tech/utils/main/notification.lua'))()
+
+function notify(title, text, duration)
+    fnl:MakeNotification({
+        Title = title or "ACR",
+        Text = text or "",
+        Duration = duration or 5
+    })
+end
+
+notify("ACR: Ativado", "Iniciando limpeza e proteção contra Kick...", 4)
+
+-- [SISTEMA ANTI-KICK] 
+-- Isso bloqueia o servidor de te expulsar por lag ou detecção
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if tostring(method) == "Kick" or tostring(method) == "kick" then
+        print("Tentativa de Kick bloqueada: " .. tostring(args[1]))
+        return nil -- Ignora o comando de kick
+    end
+    
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+-- [CONFIGURAÇÃO ACR]
+local ACRunning = true
+local ScanDelay = 1.5 -- Aumentado para não dar lag de ping
+
+-- Lista simplificada e eficiente de alvos (focado em scripts e remotes)
+local function CleanAntiCheat()
+    local targets = {
+        game:GetService("Players").LocalPlayer:WaitForChild("PlayerScripts"),
+        game:GetService("ReplicatedStorage"),
+        game:GetService("StarterGui")
+    }
+
+    for _, service in ipairs(targets) do
+        if not ACRunning then break end
+        
+        for _, item in ipairs(service:GetDescendants()) do
+            -- Procura por nomes comuns de anti-cheat
+            local name = item.Name:lower()
+            if name:find("anticheat") or name:find("exploit") or name:find("ac_") or name:find("catch") or name:find("adonis") then
+                pcall(function()
+                    item:Destroy() -- Deleta o script de segurança
+                end)
+            end
+        end
+        task.wait(0.1) -- Pausa curta entre serviços para o ping não subir
+    end
+end
+
+-- Loop principal
+task.spawn(function()
+    while ACRunning do
+        pcall(CleanAntiCheat)
+        task.wait(ScanDelay) -- Espera antes de escanear de novo
+    end
+end)
+
+notify("ACR: Pronto", "Você está protegido contra Kicks e ACs comuns.", 3)
 
 -- // SISTEMA DE FPS BOOST (ADICIONADO) // --
 local function AtivarFPSBoost()
@@ -240,11 +306,11 @@ local Window = ServerUi:MakeWindow({
         Author = "ServerUI",
         Textbox = "Insira aqui a key...",
         Button = "Confirmar",
-        KeyButton = "https://lootdest.org/s?38gZrHMq",
+        KeyButton = "https://lootdest.org/s?GoSSbtPY&data=ghdVfYP%2BAEo4gp2yU5eyhiqU3N%2B6Nd0T4xZJ8MS2JOfYyQ9i0xGYg3O%2B1qK0i8YS",
         Note = "PEGUE A PORRA DA KEY NO BOTÃO DE CHAVE ALI EM CIMA SEU VAGABUNDO🥀👎",
         FileName = "MinhaKey.txt",
         SaveKey = false,
-        Key = {"Guloso2013", "444Dokidoki"},
+        Key = {"Sayori991", "444Dokidoki"},
         Getfromsite = "https://link-hub.net/3208482/GzkdkBHvvPs4",
         UseServerKey = true,
         ServerKey = "meu-token",
