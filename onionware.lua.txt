@@ -1,0 +1,1360 @@
+-- Cleaned and restructured version
+
+-- Load anticheat disabler
+loadstring(game:HttpGet('https://rawscripts.net/raw/UPD-You-VS-Homer-Anticheat-Disabler-83416'))()
+
+-- Services
+local Players = game:GetService('Players')
+local Teams = game:GetService('Teams')
+local HttpService = game:GetService('HttpService')
+local TweenService = game:GetService('TweenService')
+local RunService = game:GetService('RunService')
+local UserInputService = game:GetService('UserInputService')
+local TextChatService = game:GetService('TextChatService')
+
+-- Destroy anticheat scripts
+local LocalPlayer = Players.LocalPlayer
+
+task.spawn(function()
+    -- Wait for scripts to load
+    task.wait(1)
+    
+    local scriptsToDestroy = {
+        LocalPlayer.PlayerScripts:FindFirstChild('QuitsAntiCheatChecker'),
+        LocalPlayer.PlayerScripts:FindFirstChild('QuitsAntiCheatLocal'),
+        game:GetService('StarterPlayer').StarterPlayerScripts:FindFirstChild('QuitsAntiCheatChecker'),
+        game:GetService('StarterPlayer').StarterPlayerScripts:FindFirstChild('QuitsAntiCheatLocal')
+    }
+    
+    for _, script in ipairs(scriptsToDestroy) do
+        if script then
+            pcall(function()
+                script:Destroy()
+            end)
+        end
+    end
+end)
+
+-- Load UI Library
+local WindUI = loadstring(game:HttpGet('https://github.com/Footagesus/WindUI/releases/latest/download/main.lua'))()
+
+-- LocalPlayer reference
+local LocalPlayer = Players.LocalPlayer
+
+-- Create Window
+local Window = WindUI:CreateWindow({
+    Author = 'Onion',
+    Title = 'Onionware vs Homer',
+    Icon = 'shrimp',
+})
+
+-- Create Sections
+local VisualSection = Window:Section({
+    Icon = 'eye',
+    Title = 'Visual',
+    Opened = false,
+})
+
+local UtilitySection = Window:Section({
+    Icon = 'wrench',
+    Title = 'Utility',
+    Opened = false,
+})
+
+local FunSection = Window:Section({
+    Icon = 'sparkles',
+    Title = 'Fun',
+    Opened = false,
+})
+
+local CommunitySection = Window:Section({
+    Icon = 'users',
+    Title = 'Community',
+    Opened = false,
+})
+
+-- Create Tabs
+local ESPTab = VisualSection:Tab({
+    Title = 'ESP',
+    Icon = 'eye',
+})
+
+local WorldTab = VisualSection:Tab({
+    Title = 'World',
+    Icon = 'earth',
+})
+
+local AutomationTab = UtilitySection:Tab({
+    Title = 'Automation',
+    Icon = 'cpu',
+})
+
+local TeleportsTab = UtilitySection:Tab({
+    Title = 'Teleports',
+    Icon = 'land-plot',
+})
+
+local KeybindTab = UtilitySection:Tab({
+    Title = 'Keybind',
+    Icon = 'keyboard',
+})
+
+local PlayerTab = UtilitySection:Tab({
+    Title = 'Player',
+    Icon = 'user',
+})
+
+local SkinsTab = UtilitySection:Tab({
+    Title = 'Skins',
+    Icon = 'shirt',
+})
+
+local TrollTab = FunSection:Tab({
+    Title = 'Troll',
+    Icon = 'ghost',
+})
+
+local ServersTab = CommunitySection:Tab({
+    Title = 'Servers',
+    Icon = 'discord',
+})
+
+-- Variables
+local BartTeam = Teams:WaitForChild('Bart')
+local HomerTeam = Teams:WaitForChild('Homer')
+local CurrentSpeed = 16
+
+-- ESP Variables
+local BartESPEnabled = false
+local HomerESPEnabled = false
+local ESPObjects = {}
+
+-- ESP Helper Functions
+local function createESP(character, teamName)
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local espKey = character.Name .. "_" .. teamName
+    
+    -- Remove existing ESP if it exists
+    if ESPObjects[espKey] then
+        for _, obj in pairs(ESPObjects[espKey]) do
+            if obj and obj.Parent then
+                obj:Destroy()
+            end
+        end
+        ESPObjects[espKey] = nil
+    end
+    
+    local espTable = {}
+    
+    -- Create Highlight
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESP_Highlight"
+    highlight.Adornee = character
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    
+    if teamName == "Homer" then
+        highlight.FillColor = Color3.fromRGB(255, 0, 0)
+        highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    elseif teamName == "Bart" then
+        highlight.FillColor = Color3.fromRGB(255, 255, 255)
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    end
+    
+    highlight.Parent = character
+    table.insert(espTable, highlight)
+    
+    -- Create BillboardGui for text label
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_Billboard"
+    billboard.Adornee = hrp
+    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = hrp
+    
+    -- Create TextLabel
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Name = "ESP_Label"
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 18
+    textLabel.Text = teamName
+    
+    if teamName == "Homer" then
+        textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    elseif teamName == "Bart" then
+        textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+    
+    textLabel.TextStrokeTransparency = 0
+    textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    textLabel.Parent = billboard
+    
+    table.insert(espTable, billboard)
+    
+    ESPObjects[espKey] = espTable
+end
+
+local function removeESP(character, teamName)
+    local espKey = character.Name .. "_" .. teamName
+    if ESPObjects[espKey] then
+        for _, obj in pairs(ESPObjects[espKey]) do
+            if obj and obj.Parent then
+                obj:Destroy()
+            end
+        end
+        ESPObjects[espKey] = nil
+    end
+end
+
+local function removeAllESP()
+    for key, espTable in pairs(ESPObjects) do
+        for _, obj in pairs(espTable) do
+            if obj and obj.Parent then
+                obj:Destroy()
+            end
+        end
+    end
+    ESPObjects = {}
+end
+
+local function updateESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local character = player.Character
+            local humanoid = character:FindFirstChild("Humanoid")
+            
+            if humanoid and humanoid.Health > 0 then
+                if player.Team == HomerTeam and HomerESPEnabled then
+                    createESP(character, "Homer")
+                elseif player.Team == BartTeam and BartESPEnabled then
+                    createESP(character, "Bart")
+                else
+                    -- Remove ESP if player is on Dead team or ESP is disabled
+                    removeESP(character, "Homer")
+                    removeESP(character, "Bart")
+                end
+            else
+                -- Remove ESP if player is dead
+                removeESP(character, "Homer")
+                removeESP(character, "Bart")
+            end
+        end
+    end
+end
+
+-- Fun Tab Features
+local SpamPizzaEnabled = false
+
+TrollTab:Toggle({
+    Title = 'Spam Pizza',
+    Default = false,
+    Callback = function(enabled)
+        SpamPizzaEnabled = enabled
+        
+        if enabled then
+            task.spawn(function()
+                while SpamPizzaEnabled do
+                    task.wait(0.1)
+                    
+                    if not LocalPlayer.Character then continue end
+                    
+                    local Backpack = LocalPlayer.Backpack
+                    local Character = LocalPlayer.Character
+                    local Humanoid = Character:FindFirstChild('Humanoid')
+                    local Pizza = Backpack:FindFirstChild('Pizza')
+                    
+                    if Pizza and Humanoid then
+                        -- Equip and unequip pizza rapidly
+                        if Pizza.Parent == Backpack then
+                            Humanoid:EquipTool(Pizza)
+                        end
+                        task.wait(0.05)
+                        if Pizza.Parent == Character then
+                            Humanoid:UnequipTools()
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+TrollTab:Button({
+    Title = 'Domer Taunt Tool',
+    Desc = 'The sound is client-sided.',
+    Callback = function()
+        local Character = LocalPlayer.Character
+        Character:WaitForChild('Humanoid')
+        Character:WaitForChild('HumanoidRootPart')
+
+        local Tool = Instance.new('Tool')
+        Tool.Name = 'Domer'
+        Tool.RequiresHandle = false
+
+        local Sound = Instance.new('Sound')
+        Sound.SoundId = 'rbxassetid://114448534984892'
+        Sound.Parent = Tool
+        Tool.TextureId = 'rbxassetid://129375457836545'
+        Tool.ToolTip = 'Domer Taunt'
+
+        Tool.Activated:Connect(function()
+            if Sound.IsPlaying then
+                Sound:Stop()
+            end
+            Sound:Play()
+            
+            local TextChannel = TextChatService:FindFirstChild('TextChannels'):FindFirstChild('RBXGeneral')
+            TextChannel:SendAsync('Domer 👶')
+            wait(1)
+            TextChannel:SendAsync('✅')
+            wait(0.9)
+            TextChannel:SendAsync('Domer 🐥')
+            wait(0.9)
+            TextChannel:SendAsync('✅')
+            wait(0.9)
+            TextChannel:SendAsync('Domer 👼')
+            wait(0.9)
+            TextChannel:SendAsync('✅')
+            wait(0.9)
+            TextChannel:SendAsync('DoMEr 😡')
+        end)
+
+        Tool.Unequipped:Connect(function()
+            if Sound.IsPlaying then
+                Sound:Stop()
+            end
+        end)
+
+        Tool.Parent = LocalPlayer:FindFirstChild('Backpack')
+    end,
+})
+
+TrollTab:Button({
+    Title = 'Fake Ritual (Homer)',
+    Callback = function()
+        local Character = LocalPlayer.Character
+        local Humanoid = Character:FindFirstChild('Humanoid')
+        
+        local Part = Instance.new('Part')
+        Part.Size = Vector3.new(8, 1, 8)
+        Part.CFrame = Character:FindFirstChild('HumanoidRootPart').CFrame * CFrame.new(0, -3.5, 0)
+        Part.Anchored = true
+        Part.BrickColor = BrickColor.new('Bright red')
+        Part.Material = Enum.Material.Neon
+        Part.Parent = workspace
+
+        local RotateConnection = RunService.Heartbeat:Connect(function(deltaTime)
+            if Part.Parent then
+                Part.CFrame = Part.CFrame * CFrame.Angles(0, math.rad(67 * deltaTime / 3), 0)
+            end
+        end)
+
+        local Tween = TweenService:Create(Part, TweenInfo.new(10, Enum.EasingStyle.Linear), {
+            CFrame = Part.CFrame * CFrame.new(0, 16, 0),
+        })
+        Tween:Play()
+        
+        task.wait(10)
+        RotateConnection:Disconnect()
+        Humanoid.Health = 0
+        task.wait(0.1)
+        Part:Destroy()
+    end,
+})
+
+-- Player Tab Features
+local InfJumpEnabled = false
+local NoclipEnabled = false
+local NoclipConnection = nil
+
+PlayerTab:Toggle({
+    Title = 'Inf Jump',
+    Default = false,
+    Callback = function(enabled)
+        InfJumpEnabled = enabled
+    end,
+})
+
+PlayerTab:Slider({
+    Title = 'Speed',
+    Step = 1,
+    Value = {
+        Min = 16,
+        Default = 16,
+        Max = 676767,
+    },
+    Callback = function(value)
+        CurrentSpeed = value
+    end,
+})
+
+PlayerTab:Button({
+    Title = 'Apply Speed',
+    Callback = function()
+        local Humanoid = LocalPlayer.Character:FindFirstChild('Humanoid')
+        if Humanoid then
+            Humanoid.WalkSpeed = CurrentSpeed
+        end
+    end,
+})
+
+PlayerTab:Button({
+    Title = 'Fly Gui V3',
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt'))()
+    end,
+})
+
+PlayerTab:Button({
+    Title = 'Anti AFK',
+    Callback = function()
+        -- Prevent AFK kick by moving character slightly
+        local VirtualUser = game:GetService("VirtualUser")
+        
+        LocalPlayer.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+        
+        -- Additional anti-AFK by periodic small movements
+        task.spawn(function()
+            while true do
+                task.wait(300) -- Every 5 minutes
+                
+                if LocalPlayer.Character then
+                    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        humanoid:Move(Vector3.new(0, 0, 0))
+                    end
+                end
+            end
+        end)
+        
+        -- Notify user
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Anti AFK";
+            Text = "Anti AFK enabled!";
+            Duration = 3;
+        })
+    end,
+})
+
+PlayerTab:Toggle({
+    Title = 'Noclip',
+    Default = false,
+    Callback = function(enabled)
+        NoclipEnabled = enabled
+        
+        if enabled then
+            -- Disconnect old connection if exists
+            if NoclipConnection then
+                NoclipConnection:Disconnect()
+            end
+            
+            NoclipConnection = RunService.Stepped:Connect(function()
+                if not NoclipEnabled then
+                    return
+                end
+                
+                local Character = LocalPlayer.Character
+                if Character then
+                    for _, part in pairs(Character:GetDescendants()) do
+                        if part:IsA('BasePart') then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        else
+            -- Disconnect the noclip connection
+            if NoclipConnection then
+                NoclipConnection:Disconnect()
+                NoclipConnection = nil
+            end
+            
+            -- Re-enable collision for all parts
+            local Character = LocalPlayer.Character
+            if Character then
+                for _, part in pairs(Character:GetDescendants()) do
+                    if part:IsA('BasePart') then
+                        -- Only re-enable collision for parts that should have it
+                        if part.Name == "Head" or part.Name:find("Arm") or part.Name:find("Leg") or part.Name:find("Torso") then
+                            part.CanCollide = true
+                        end
+                        -- HumanoidRootPart should stay CanCollide = false
+                        if part.Name == "HumanoidRootPart" then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end
+        end
+    end,
+})
+
+-- Teleports Tab
+TeleportsTab:Button({
+    Title = 'Go to island bar spawn',
+    Callback = function()
+        local Character = LocalPlayer.Character
+        if Character then
+            local HRP = Character:FindFirstChild('HumanoidRootPart')
+            if HRP then
+                HRP.CFrame = CFrame.new(-2, -132, -55)
+            end
+        end
+    end,
+})
+
+TeleportsTab:Button({
+    Title = 'Go to homer intermission',
+    Callback = function()
+        local Character = LocalPlayer.Character
+        if Character then
+            local HRP = Character:FindFirstChild('HumanoidRootPart')
+            if HRP then
+                HRP.CFrame = CFrame.new(-14, 104, 1805)
+            end
+        end
+    end,
+})
+
+TeleportsTab:Button({
+    Title = 'Go to krusty krab spawn',
+    Callback = function()
+        local Character = LocalPlayer.Character
+        if Character then
+            local HRP = Character:FindFirstChild('HumanoidRootPart')
+            if HRP then
+                HRP.CFrame = CFrame.new(2, -80, -72)
+            end
+        end
+    end,
+})
+
+TeleportsTab:Button({
+    Title = 'Go to spaceship spawn',
+    Callback = function()
+        local Character = LocalPlayer.Character
+        if Character then
+            local HRP = Character:FindFirstChild('HumanoidRootPart')
+            if HRP then
+                HRP.CFrame = CFrame.new(8, -98, -209)
+            end
+        end
+    end,
+})
+
+TeleportsTab:Button({
+    Title = 'Go to simpsons house spawn',
+    Callback = function()
+        local Character = LocalPlayer.Character
+        if Character then
+            local HRP = Character:FindFirstChild('HumanoidRootPart')
+            if HRP then
+                HRP.CFrame = CFrame.new(-23, -80, -82)
+            end
+        end
+    end,
+})
+
+TeleportsTab:Button({
+    Title = 'Go to moes tavern spawn',
+    Callback = function()
+        local Character = LocalPlayer.Character
+        if Character then
+            local HRP = Character:FindFirstChild('HumanoidRootPart')
+            if HRP then
+                HRP.CFrame = CFrame.new(55, -79, -49)
+            end
+        end
+    end,
+})
+
+-- World Tab
+WorldTab:Button({
+    Title = 'Remove Fog',
+    Callback = function()
+        game.Lighting.FogEnd = 100000
+        game.Lighting.FogStart = 0
+        game.Lighting.ClockTime = 14
+        game.Lighting.Brightness = 2
+        game.Lighting.GlobalShadows = false
+    end,
+})
+
+WorldTab:Toggle({
+    Title = 'FullBright',
+    Default = false,
+    Callback = function(enabled)
+        if enabled then
+            local Lighting = game:GetService('Lighting')
+            
+            Lighting.Brightness = 2
+            Lighting.Ambient = Color3.new(1, 1, 1)
+            Lighting.ColorShift_Top = Color3.new(1, 1, 1)
+            Lighting.ColorShift_Bottom = Color3.new(1, 1, 1)
+            Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+            Lighting.FogEnd = 9000000000
+            Lighting.FogStart = 0
+            Lighting.GlobalShadows = false
+            
+            -- Remove shadows from all lights
+            for _, light in ipairs(Lighting:GetDescendants()) do
+                if light:IsA('Light') then
+                    light.Shadows = false
+                end
+            end
+        else
+            -- Reset to defaults (you may want to store original values)
+            local Lighting = game:GetService('Lighting')
+            Lighting.Brightness = 1
+            Lighting.Ambient = Color3.new(0.5, 0.5, 0.5)
+            Lighting.ColorShift_Top = Color3.new(0, 0, 0)
+            Lighting.ColorShift_Bottom = Color3.new(0, 0, 0)
+            Lighting.OutdoorAmbient = Color3.new(0.5, 0.5, 0.5)
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 0
+            Lighting.GlobalShadows = true
+        end
+    end,
+})
+
+WorldTab:Button({
+    Title = 'Black Screen',
+    Desc = 'good for AFK farming',
+    Callback = function()
+        local ScreenGui = Instance.new('ScreenGui')
+        ScreenGui.Name = 'BlackoutOverlay'
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.IgnoreGuiInset = true
+        ScreenGui.DisplayOrder = 999999
+        ScreenGui.Parent = game:GetService('CoreGui')
+
+        local Frame = Instance.new('Frame')
+        Frame.Size = UDim2.new(1, 0, 1, 0)
+        Frame.Position = UDim2.new(0, 0, 0, 0)
+        Frame.BackgroundColor3 = Color3.new(0, 0, 0)
+        Frame.BackgroundTransparency = 0
+        Frame.ZIndex = 999999
+        Frame.Parent = ScreenGui
+    end,
+})
+
+-- Keybind Tab
+KeybindTab:Keybind({
+    Title = 'UI Keybind',
+    Desc = 'Keybind to open ui',
+    Value = 'G',
+    Callback = function(key)
+        Window:SetToggleKey(Enum.KeyCode[key])
+    end,
+})
+
+-- Skins Tab
+local function buySkin(character, skinName, price)
+    game:GetService('ReplicatedStorage'):WaitForChild('eventFolders')
+        :WaitForChild('store'):WaitForChild('buyItem'):FireServer(character, skinName, price)
+    task.wait(0.05)
+    game:GetService('ReplicatedStorage'):WaitForChild('eventFolders')
+        :WaitForChild('store'):WaitForChild('changeSkin'):FireServer(character, skinName)
+end
+
+-- Bart Skins
+SkinsTab:Button({
+    Title = 'Santa Bart [375]',
+    Callback = function()
+        buySkin('Bart', 'Santa Bart', 375)
+    end,
+})
+
+SkinsTab:Button({
+    Title = 'Ghost Bart [555]',
+    Callback = function()
+        buySkin('Bart', 'Ghost Bart', 555)
+    end,
+})
+
+SkinsTab:Button({
+    Title = 'Jacko Bart [210]',
+    Callback = function()
+        buySkin('Bart', 'Jacko Bart', 210)
+    end,
+})
+
+SkinsTab:Button({
+    Title = 'Frozen Bart [335]',
+    Callback = function()
+        buySkin('Bart', 'Frozen Bart', 335)
+    end,
+})
+
+SkinsTab:Button({
+    Title = '1M Bart [100]',
+    Callback = function()
+        buySkin('Bart', '1M', 100)
+    end,
+})
+
+SkinsTab:Button({
+    Title = '700k Bart [100]',
+    Callback = function()
+        buySkin('Bart', '700k', 100)
+    end,
+})
+
+SkinsTab:Button({
+    Title = 'Witch Bart [350]',
+    Callback = function()
+        buySkin('Bart', 'Witch Bart', 350)
+    end,
+})
+
+SkinsTab:Button({
+    Title = 'Beauty [Free]',
+    Callback = function()
+        buySkin('Bart', 'Beauty', 0)
+    end,
+})
+
+SkinsTab:Button({
+    Title = 'CPT Bart[Free]',
+    Callback = function()
+        buySkin('Bart', 'CPT', 0)
+    end,
+})
+
+-- Homer Skins
+SkinsTab:Button({
+    Title = 'Rhonda Homer[2500]',
+    Callback = function()
+        buySkin('Homer', 'Rhonda', 2500)
+    end,
+})
+
+SkinsTab:Button({
+    Title = 'Zomber Homer[700]',
+    Callback = function()
+        buySkin('Homer', 'Zomber', 700)
+    end,
+})
+
+SkinsTab:Button({
+    Title = 'Nettspend Homer[2000]',
+    Callback = function()
+        buySkin('Homer', 'Nettspend', 2000)
+    end,
+})
+
+-- Inf Jump Implementation
+UserInputService.JumpRequest:Connect(function()
+    if InfJumpEnabled and LocalPlayer.Character then
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass('Humanoid')
+        if humanoid then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+-- ESP Tab
+ESPTab:Toggle({
+    Title = 'Bart ESP',
+    Default = false,
+    Callback = function(enabled)
+        BartESPEnabled = enabled
+        if not enabled then
+            -- Remove all Bart ESP when disabled
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player.Character then
+                    removeESP(player.Character, "Bart")
+                end
+            end
+        else
+            updateESP()
+        end
+    end,
+})
+
+ESPTab:Toggle({
+    Title = 'Homer ESP',
+    Default = false,
+    Callback = function(enabled)
+        HomerESPEnabled = enabled
+        if not enabled then
+            -- Remove all Homer ESP when disabled
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player.Character then
+                    removeESP(player.Character, "Homer")
+                end
+            end
+        else
+            updateESP()
+        end
+    end,
+})
+
+-- ESP Update Loop
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if BartESPEnabled or HomerESPEnabled then
+            updateESP()
+        end
+    end
+end)
+
+-- Handle new players joining
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        task.wait(1) -- Wait for character to fully load
+        if BartESPEnabled or HomerESPEnabled then
+            updateESP()
+        end
+    end)
+end)
+
+-- Handle existing players' characters
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function(character)
+            task.wait(1)
+            if BartESPEnabled or HomerESPEnabled then
+                updateESP()
+            end
+        end)
+    end
+end
+
+-- Automation Tab
+local KillAllEnabled = false
+
+AutomationTab:Toggle({
+    Title = 'Kill All (Homer)',
+    Default = false,
+    Callback = function(enabled)
+        KillAllEnabled = enabled
+        
+        -- Check if player is on Homer team
+        if enabled then
+            if LocalPlayer.Team and LocalPlayer.Team.Name ~= "Homer" then
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = "Auto Kill";
+                    Text = "Only works when on team Homer!";
+                    Duration = 3;
+                })
+                return
+            end
+        end
+        
+        if enabled then
+            task.spawn(function()
+                while KillAllEnabled do
+                    task.wait(1) -- Wait 1 second between teleports as per original
+                    
+                    if not LocalPlayer.Character then continue end
+                    if LocalPlayer.Team.Name ~= "Homer" then continue end
+                    
+                    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if not myHRP then continue end
+                    
+                    -- Find any Bart player to teleport to
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if player ~= LocalPlayer and player.Team and player.Team.Name == "Bart" then
+                            local char = player.Character
+                            if char then
+                                local hrp = char:FindFirstChild("HumanoidRootPart")
+                                local humanoid = char:FindFirstChild("Humanoid")
+                                
+                                if hrp and humanoid and humanoid.Health > 0 then
+                                    -- Teleport directly to the Bart player
+                                    myHRP.CFrame = hrp.CFrame
+                                    break -- Only teleport to one player per cycle
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+AutomationTab:Toggle({
+    Title = 'Kick when mods detected',
+    Desc = 'credits to Ezzy.net',
+    Value = false,
+    Callback = function(enabled)
+        if enabled then
+            -- List of known moderator/admin usernames (update as needed)
+            local modList = {
+                "Roblox",
+                "builderman",
+                -- Add known game moderators here
+            }
+            
+            local function checkForMods()
+                for _, player in ipairs(Players:GetPlayers()) do
+                    for _, modName in ipairs(modList) do
+                        if player.Name:lower():find(modName:lower()) or 
+                           (player:GetRankInGroup(0) >= 250) then -- Check group rank if applicable
+                            -- Moderator detected, kick self
+                            LocalPlayer:Kick("Moderator detected in server. Auto-kicked for safety.")
+                            return
+                        end
+                    end
+                    
+                    -- Check if player has admin commands
+                    if player:FindFirstChild("PlayerGui") then
+                        local gui = player.PlayerGui
+                        if gui:FindFirstChild("Admin") or gui:FindFirstChild("Moderator") then
+                            LocalPlayer:Kick("Moderator detected in server. Auto-kicked for safety.")
+                            return
+                        end
+                    end
+                end
+            end
+            
+            -- Check on enable
+            checkForMods()
+            
+            -- Check when new players join
+            Players.PlayerAdded:Connect(function(player)
+                if enabled then
+                    task.wait(1)
+                    checkForMods()
+                end
+            end)
+        end
+    end,
+})
+
+AutomationTab:Toggle({
+    Title = 'Kill All Via Bluetooth (Homer)',
+    Default = false,
+    Callback = function(enabled)
+        if enabled then
+            task.spawn(function()
+                while enabled do
+                    task.wait(0.1)
+                    
+                    if not LocalPlayer.Character then continue end
+                    if LocalPlayer.Team and LocalPlayer.Team.Name ~= "Homer" then continue end
+                    
+                    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if not myHRP then continue end
+                    
+                    -- Use RemoteEvents/RemoteFunctions to kill players (game-specific)
+                    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                    
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if player ~= LocalPlayer and player.Team and player.Team.Name == "Bart" then
+                            local char = player.Character
+                            if char then
+                                local hrp = char:FindFirstChild("HumanoidRootPart")
+                                local humanoid = char:FindFirstChild("Humanoid")
+                                
+                                if hrp and humanoid and humanoid.Health > 0 then
+                                    -- Try to find kill remote
+                                    local killRemote = ReplicatedStorage:FindFirstChild("KillPlayer") or
+                                                      ReplicatedStorage:FindFirstChild("DamagePlayer") or
+                                                      ReplicatedStorage:FindFirstChild("HitPlayer")
+                                    
+                                    if killRemote and killRemote:IsA("RemoteEvent") then
+                                        killRemote:FireServer(player)
+                                    elseif killRemote and killRemote:IsA("RemoteFunction") then
+                                        killRemote:InvokeServer(player)
+                                    end
+                                    
+                                    -- Fallback: teleport method
+                                    myHRP.CFrame = hrp.CFrame
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+local RitualSpeed = 0.01
+local RitualEnabled = false
+local RitualNoclipConnection = nil
+
+AutomationTab:Slider({
+    Title = 'Ritual Speed',
+    Step = 0.001,
+    Value = {
+        Min = 0.001,
+        Default = 0.01,
+        Max = 0.1,
+    },
+    Callback = function(value)
+        RitualSpeed = value
+    end,
+})
+
+AutomationTab:Toggle({
+    Title = 'Ritual (Homer)',
+    Default = false,
+    Callback = function(enabled)
+        RitualEnabled = enabled
+        
+        if enabled then
+            -- Enable noclip for ritual
+            if LocalPlayer.Character then
+                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA('BasePart') then
+                        part.CanCollide = false
+                    end
+                end
+            end
+            
+            -- Disconnect old connection if exists
+            if RitualNoclipConnection then
+                RitualNoclipConnection:Disconnect()
+            end
+            
+            -- Keep noclip active
+            RitualNoclipConnection = RunService.Stepped:Connect(function()
+                if not RitualEnabled then
+                    return
+                end
+                
+                if LocalPlayer.Character then
+                    for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                        if part:IsA('BasePart') then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+            
+            -- Handle character respawn
+            LocalPlayer.CharacterAdded:Connect(function(character)
+                if RitualEnabled then
+                    for _, part in ipairs(character:GetDescendants()) do
+                        if part:IsA('BasePart') then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+            
+            -- Main ritual loop
+            task.spawn(function()
+                local angle = 0
+                local ritualRadius = 17 -- 17 studs from Homer as per tooltip
+                
+                while RitualEnabled do
+                    task.wait(RitualSpeed)
+                    
+                    if not LocalPlayer.Character then continue end
+                    if LocalPlayer.Team and LocalPlayer.Team.Name ~= "Bart" then continue end
+                    
+                    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if not myHRP then continue end
+                    
+                    -- Find closest Homer player
+                    local closestHomer = nil
+                    local closestDistance = math.huge
+                    
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if player.Team and player.Team.Name == "Homer" then
+                            local char = player.Character
+                            if char then
+                                local hrp = char:FindFirstChild("HumanoidRootPart")
+                                if hrp then
+                                    local distance = (myHRP.Position - hrp.Position).Magnitude
+                                    if distance < closestDistance then
+                                        closestDistance = distance
+                                        closestHomer = hrp
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- Circle around the Homer
+                    if closestHomer then
+                        local x = math.cos(angle) * ritualRadius
+                        local z = math.sin(angle) * ritualRadius
+                        
+                        local targetPos = closestHomer.Position + Vector3.new(x, 0, z)
+                        myHRP.CFrame = CFrame.new(targetPos, closestHomer.Position)
+                        
+                        angle = angle + 0.1
+                        if angle >= math.pi * 2 then
+                            angle = 0
+                        end
+                    end
+                end
+            end)
+        else
+            -- Disconnect the ritual noclip connection
+            if RitualNoclipConnection then
+                RitualNoclipConnection:Disconnect()
+                RitualNoclipConnection = nil
+            end
+            
+            -- Re-enable collision when disabled
+            if LocalPlayer.Character then
+                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA('BasePart') then
+                        -- Only re-enable collision for parts that should have it
+                        if part.Name == "Head" or part.Name:find("Arm") or part.Name:find("Leg") or part.Name:find("Torso") then
+                            part.CanCollide = true
+                        end
+                        -- HumanoidRootPart should stay CanCollide = false
+                        if part.Name == "HumanoidRootPart" then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end
+        end
+    end,
+})
+
+local CoinFarmEnabled = false
+local CoinFarmCenter = CFrame.new(-33.093822479248, 207.94999694824, 111.34393310547)
+
+AutomationTab:Toggle({
+    Title = 'Coin Farm (Teleport)',
+    Default = false,
+    Callback = function(enabled)
+        CoinFarmEnabled = enabled
+        
+        if enabled then
+            -- Make character transparent
+            task.wait(0.5)
+            if LocalPlayer.Character then
+                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA('BasePart') then
+                        part.Transparency = 1
+                    end
+                end
+            end
+            
+            task.spawn(function()
+                local angle = 0
+                local radius = 2
+                
+                while CoinFarmEnabled do
+                    if not LocalPlayer.Character then 
+                        task.wait(0.5)
+                        continue 
+                    end
+                    
+                    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if not hrp then 
+                        task.wait(0.5)
+                        continue 
+                    end
+                    
+                    -- Calculate position in circular path
+                    local x = math.cos(angle) * radius
+                    local z = math.sin(angle) * radius
+                    
+                    -- Teleport to position in circle
+                    hrp.CFrame = CFrame.new(CoinFarmCenter.Position + Vector3.new(x, 0, z))
+                    
+                    -- Keep character transparent
+                    for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                        if part:IsA('BasePart') then
+                            part.Transparency = 1
+                        end
+                    end
+                    
+                    -- Increment angle for circular motion
+                    angle = angle + 0.1
+                    if angle >= math.pi * 2 then
+                        angle = 0
+                    end
+                    
+                    task.wait()
+                end
+                
+                -- Restore transparency when disabled
+                if LocalPlayer.Character then
+                    for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                        if part:IsA('BasePart') and part.Name ~= "HumanoidRootPart" then
+                            part.Transparency = 0
+                        end
+                    end
+                end
+            end)
+            
+            -- Handle character respawn
+            LocalPlayer.CharacterAdded:Connect(function(character)
+                if CoinFarmEnabled then
+                    task.wait(0.1)
+                    for _, part in ipairs(character:GetDescendants()) do
+                        if part:IsA('BasePart') then
+                            part.Transparency = 1
+                        end
+                    end
+                end
+            end)
+        else
+            -- Restore transparency when disabled
+            if LocalPlayer.Character then
+                for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA('BasePart') and part.Name ~= "HumanoidRootPart" then
+                        part.Transparency = 0
+                    end
+                end
+            end
+        end
+    end,
+})
+
+AutomationTab:Toggle({
+    Title = 'Auto Farm',
+    Default = false,
+    Callback = function(enabled)
+        if enabled then
+            task.spawn(function()
+                while enabled do
+                    task.wait(0.5)
+                    
+                    if not LocalPlayer.Character then continue end
+                    
+                    local myHRP = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local myHumanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+                    if not myHRP or not myHumanoid then continue end
+                    
+                    -- Auto farm based on team
+                    if LocalPlayer.Team and LocalPlayer.Team.Name == "Homer" then
+                        -- Homer: Hunt Barts (same as Auto Kill)
+                        for _, player in ipairs(Players:GetPlayers()) do
+                            if player ~= LocalPlayer and player.Team and player.Team.Name == "Bart" then
+                                local char = player.Character
+                                if char then
+                                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                                    local humanoid = char:FindFirstChild("Humanoid")
+                                    
+                                    if hrp and humanoid and humanoid.Health > 0 then
+                                        myHRP.CFrame = hrp.CFrame
+                                        task.wait(1)
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    elseif LocalPlayer.Team and LocalPlayer.Team.Name == "Bart" then
+                        -- Bart: Use coin farm circular pattern
+                        local angle = math.random() * math.pi * 2 -- Random start angle
+                        local radius = 2
+                        
+                        for i = 1, 20 do -- Do 20 movements in circle
+                            if not enabled then break end
+                            
+                            local x = math.cos(angle) * radius
+                            local z = math.sin(angle) * radius
+                            
+                            if myHRP then
+                                myHRP.CFrame = CFrame.new(CoinFarmCenter.Position + Vector3.new(x, 0, z))
+                            end
+                            
+                            angle = angle + 0.1
+                            task.wait()
+                        end
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+-- Discord Server Info
+local DiscordResponse = WindUI.Creator.Request({
+    Url = 'https://discord.com/api/v10/invites/AuytXr9VFj?with_counts=true&with_expiration=true',
+    Method = 'GET',
+    Headers = {
+        ['User-Agent'] = 'RobloxBot/1.0',
+        Accept = 'application/json',
+    },
+})
+
+local DiscordData = HttpService:JSONDecode(DiscordResponse.Body)
+local Guild = DiscordData.guild
+local MemberCount = DiscordData.approximate_member_count
+local OnlineCount = DiscordData.approximate_presence_count
+
+ServersTab:Paragraph({
+    ImageSize = 42,
+    Image = 'https://cdn.discordapp.com/icons/' .. Guild.id .. '/' .. Guild.icon .. '.png?size=1024',
+    Title = Guild.name,
+    Desc = ' <font color="#52525b">•</font> Member Count : ' .. tostring(MemberCount) .. 
+           '\n <font color="#16a34a">•</font> Online Count : ' .. tostring(OnlineCount),
+})
+
+ServersTab:Button({
+    Title = 'Update Info',
+    Callback = function()
+        local success, response = pcall(function()
+            return WindUI.Creator.Request({
+                Url = 'https://discord.com/api/v10/invites/AuytXr9VFj?with_counts=true&with_expiration=true',
+                Method = 'GET',
+                Headers = {
+                    ['User-Agent'] = 'RobloxBot/1.0',
+                    Accept = 'application/json',
+                },
+            })
+        end)
+        
+        if success and response then
+            local data = HttpService:JSONDecode(response.Body)
+            
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Discord Info Updated";
+                Text = "Members: " .. tostring(data.approximate_member_count) .. " | Online: " .. tostring(data.approximate_presence_count);
+                Duration = 5;
+            })
+        else
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Update Failed";
+                Text = "Could not fetch Discord info";
+                Duration = 3;
+            })
+        end
+    end,
+})
+
+ServersTab:Button({
+    Title = 'Join Discord',
+    Callback = function()
+        local discordInvite = "https://discord.gg/AuytXr9VFj"
+        
+        -- Copy to clipboard (if supported)
+        if setclipboard then
+            setclipboard(discordInvite)
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Discord Invite";
+                Text = "Invite link copied to clipboard!";
+                Duration = 5;
+            })
+        else
+            -- Show invite code if clipboard not supported
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Discord Invite";
+                Text = "Join: discord.gg/AuytXr9VFj";
+                Duration = 10;
+            })
+        end
+        
+        -- Try to open in browser (executor-dependent)
+        if syn and syn.request then
+            syn.request({
+                Url = discordInvite,
+                Method = "GET"
+            })
+        end
+    end,
+})
